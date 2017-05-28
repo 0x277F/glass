@@ -98,7 +98,7 @@ public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
         logger.info("Resynchronizing " + ctx.channel().remoteAddress() + " to " + host + ":" + (ssl ? "+" : "") + port);
         if (upstream != null) {
             upstream.closeFuture().addListener((ChannelFutureListener) future -> proxyServer.createProxy(host, port, ctx.channel(), this, ssl));
-            upstream.writeAndFlush("QUIT :Resynchronizing client");
+            upstream.writeAndFlush("QUIT :Resynchronizing client\r\n");
         } else {
             proxyServer.createProxy(host, port, ctx.channel(), this, ssl);
         }
@@ -108,7 +108,7 @@ public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         proxyServer.getActiveChannels().remove(this);
         if (upstream != null) {
-            upstream.write("QUIT :Client connection lost.");
+            upstream.write("QUIT :Client connection lost.\r\n");
             upstream.close();
         }
         nick = null;
