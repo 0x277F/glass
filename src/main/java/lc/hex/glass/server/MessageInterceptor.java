@@ -78,10 +78,9 @@ public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
             });
         }
 
-
-        else if (split[0].equalsIgnoreCase("privmsg")) {
+        if (split[0].equalsIgnoreCase("PRIVMSG")) {
             String channel = split[1];
-            String msg = s.substring((s.contains(":") ? s.indexOf(':', 7) : 7) + 1);
+            String msg = s.substring(s.indexOf(':', 7) + 1);
             if (msg.startsWith("@")) {
                 String[] args = msg.split(" ");
                 if (args.length >= 3 && args[0].equalsIgnoreCase("@syn")) {
