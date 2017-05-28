@@ -1,5 +1,6 @@
 package lc.hex.glass.server;
 
+import com.google.inject.assistedinject.Assisted;
 import io.netty.channel.*;
 import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.string.StringDecoder;
@@ -7,13 +8,13 @@ import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 
+import javax.inject.Inject;
 import javax.net.ssl.SSLException;
 import java.util.logging.Logger;
 
 public class UpstreamConnector extends SimpleChannelInboundHandler<String> {
 
-    private Logger logger;
-    private ProxyServer proxyServer;
+    private final Logger logger;
     private Channel clientConnection;
     private Channel channel;
     private SslContext sslContext;
@@ -25,9 +26,9 @@ public class UpstreamConnector extends SimpleChannelInboundHandler<String> {
     private int downstreamId;
     private boolean ssl;
 
-    public UpstreamConnector(Logger logger, ProxyServer proxyServer, boolean ssl) {
+    @Inject
+    public UpstreamConnector(Logger logger, @Assisted boolean ssl) {
         this.logger = logger;
-        this.proxyServer = proxyServer;
         try {
             sslContext = SslContextBuilder.forClient().build();
         } catch (SSLException e) {
@@ -95,5 +96,9 @@ public class UpstreamConnector extends SimpleChannelInboundHandler<String> {
 
     public void setDownstreamId(int downstreamId) {
         this.downstreamId = downstreamId;
+    }
+
+    public interface Factory {
+        UpstreamConnector create(boolean ssl);
     }
 }

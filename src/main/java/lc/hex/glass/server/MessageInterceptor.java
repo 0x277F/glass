@@ -12,9 +12,9 @@ import java.util.logging.Logger;
 public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
     private static int nextID = 0;
 
-    private ProxyServer proxyServer;
-    private Logger logger;
-    private Commands commands;
+    private final ProxyServer proxyServer;
+    private final Logger logger;
+    private final Commands commands;
     private Channel upstream;
     private Channel downstream;
     private final int downstreamId;
@@ -47,6 +47,7 @@ public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
         return upstream;
     }
 
+    @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, String s) throws Exception {
         System.out.println(">>>" + s);
         String[] split = s.split(" ");
