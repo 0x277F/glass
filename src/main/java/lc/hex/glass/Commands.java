@@ -1,6 +1,7 @@
 package lc.hex.glass;
 
 import io.netty.handler.ssl.SslHandler;
+import lc.hex.glass.server.MessageInterceptor;
 import lc.hex.glass.server.ProxyServer;
 
 import javax.inject.Inject;
@@ -31,8 +32,9 @@ public class Commands {
         });
 
         register("@die", ((cmd, args, channel, ctx, interceptor) -> {
-            interceptor.getUpstream().close();
-            ctx.channel().close();
+            for (MessageInterceptor i : proxyServer.getActiveChannels()) {
+                i.getDownstream().close();
+            }
             System.exit(0);
         }));
 

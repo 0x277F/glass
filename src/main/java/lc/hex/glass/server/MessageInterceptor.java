@@ -107,6 +107,7 @@ public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        proxyServer.getActiveChannels().remove(this);
         if (upstream != null) {
             upstream.write("QUIT :Client connection lost.");
             upstream.close();

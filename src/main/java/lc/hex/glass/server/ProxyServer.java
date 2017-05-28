@@ -12,12 +12,15 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import lc.hex.glass.GlassApplication;
 
 import javax.inject.Inject;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Logger;
 
 public class ProxyServer implements Runnable {
     private Logger logger;
     private GlassApplication application;
     private NioEventLoopGroup eventLoop, childLoop;
+    private Set<MessageInterceptor> activeChannels;
 
     @Inject
     public ProxyServer(Logger logger, GlassApplication application) {
@@ -25,6 +28,7 @@ public class ProxyServer implements Runnable {
         this.application = application;
         eventLoop = new NioEventLoopGroup(1);
         childLoop = new NioEventLoopGroup();
+        activeChannels = new HashSet<>();
     }
 
     public void run() {
@@ -55,6 +59,7 @@ public class ProxyServer implements Runnable {
                 .option(ChannelOption.AUTO_READ, false);
         return bootstrap.connect(host, port).addListener((ChannelFutureListener) f -> {
             if (f.isSuccess()) {
+                activeChannels.add(interceptor);
                 Channel c = f.channel();
                 UpstreamConnector upstream = c.pipeline().get(UpstreamConnector.class);
                 upstream.setClientChannel(interceptor);
@@ -66,5 +71,9 @@ public class ProxyServer implements Runnable {
                 inbound.close();
             }
         });
+    }
+
+    public Set<MessageInterceptor> getActiveChannels() {
+        return activeChannels;
     }
 }
