@@ -9,34 +9,39 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import lc.hex.glass.GlassApplication;
 
 import javax.inject.Inject;
+import javax.inject.Provider;
+import javax.inject.Singleton;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
 
+@Singleton
 public class ProxyServer implements Runnable {
-    private Logger logger;
-    private GlassApplication application;
+    private final Logger logger;
+    private final Provider<ServerInitializer> serverInitializerProvider;
+    private final UpstreamConnector.Factory upstreamConnectorFactory;
     private NioEventLoopGroup eventLoop, childLoop;
     private Set<MessageInterceptor> activeChannels;
 
     @Inject
-    public ProxyServer(Logger logger, GlassApplication application) {
+    public ProxyServer(Logger logger, Provider<ServerInitializer> serverInitializerProvider, UpstreamConnector.Factory upstreamConnectorFactory) {
         this.logger = logger;
-        this.application = application;
+        this.serverInitializerProvider = serverInitializerProvider;
+        this.upstreamConnectorFactory = upstreamConnectorFactory;
         eventLoop = new NioEventLoopGroup(1);
         childLoop = new NioEventLoopGroup();
         activeChannels = new HashSet<>();
     }
 
+    @Override
     public void run() {
         try {
             ServerBootstrap bootstrap = new ServerBootstrap();
             bootstrap.channel(NioServerSocketChannel.class)
                     .group(eventLoop, childLoop)
-                    .childHandler(application.getInjector().getInstance(ServerInitializer.class))
+                    .childHandler(serverInitializerProvider.get())
                     .childOption(ChannelOption.AUTO_READ, false)
                     .bind(8841)
                     .sync()
@@ -55,7 +60,7 @@ public class ProxyServer implements Runnable {
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.group(childLoop)
                 .channel(NioSocketChannel.class)
-                .handler(new UpstreamConnector(logger, this, ssl))
+                .handler(upstreamConnectorFactory.create(ssl))
                 .option(ChannelOption.AUTO_READ, false);
         return bootstrap.connect(host, port).addListener((ChannelFutureListener) f -> {
             if (f.isSuccess()) {

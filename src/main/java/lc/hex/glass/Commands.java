@@ -5,6 +5,7 @@ import lc.hex.glass.server.MessageInterceptor;
 import lc.hex.glass.server.ProxyServer;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -12,10 +13,11 @@ import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+@Singleton
 public class Commands {
     private Map<String, CommandHandler> registry;
-    private Logger logger;
-    private ProxyServer proxyServer;
+    private final Logger logger;
+    private final ProxyServer proxyServer;
 
     @Inject
     public Commands(Logger logger, ProxyServer proxyServer) {
