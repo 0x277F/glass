@@ -5,6 +5,7 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import lc.hex.glass.Commands;
+import lc.hex.glass.Registers;
 
 import javax.inject.Inject;
 import java.util.logging.Logger;
@@ -15,6 +16,7 @@ public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
     private final ProxyServer proxyServer;
     private final Logger logger;
     private final Commands commands;
+    private Registers registers;
     private Channel upstream;
     private Channel downstream;
     private final int downstreamId;
@@ -23,10 +25,11 @@ public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
     private String nick, user;
 
     @Inject
-    public MessageInterceptor(ProxyServer proxyServer, Logger logger, Commands commands) {
+    public MessageInterceptor(ProxyServer proxyServer, Logger logger, Commands commands, Registers registers) {
         this.proxyServer = proxyServer;
         this.logger = logger;
         this.commands = commands;
+        this.registers = registers;
         this.downstreamId = nextID++;
     }
 
@@ -66,9 +69,13 @@ public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
             }
             if (upstream == null) channelHandlerContext.read();
         }
+        String outMessage = s;
+        for (char a : registers.inUse()) {
+            outMessage = outMessage.replace("\"*" + a, registers.get(a));
+        }
 
         if (upstream != null && upstream.isActive()) {
-            upstream.writeAndFlush(s + "\r\n").addListener((ChannelFutureListener) future -> {
+            upstream.writeAndFlush(outMessage + "\r\n").addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {
                     channelHandlerContext.channel().read();
                 } else {
@@ -89,6 +96,9 @@ public class MessageInterceptor extends SimpleChannelInboundHandler<String> {
                 } else if (commands.contains(args[0])){
                     commands.get(args[0]).handle(args[0], args, channel, channelHandlerContext, this);
                 }
+            }
+            if (msg.substring(0, msg.length() - 1).endsWith(">\"")) {
+                registers.set(msg.charAt(msg.length() - 1), msg.substring(0, msg.length() - 3));
             }
         } else if (split.length >= 3 && split[0].equalsIgnoreCase("syn")) {
             synchronizeTo(split[1], Integer.parseInt(split[2].trim()), split.length >= 4 && split[3].equalsIgnoreCase("-s"), channelHandlerContext);

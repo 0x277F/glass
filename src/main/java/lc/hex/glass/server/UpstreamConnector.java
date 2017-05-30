@@ -22,7 +22,6 @@ public class UpstreamConnector extends SimpleChannelInboundHandler<String> {
     private String nick;
     private String user;
 
-
     private int downstreamId;
     private boolean ssl;
 

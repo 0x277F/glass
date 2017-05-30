@@ -18,9 +18,11 @@ public class Commands {
     private Map<String, CommandHandler> registry;
     private final Logger logger;
     private final ProxyServer proxyServer;
+    private Registers registers;
 
     @Inject
-    public Commands(Logger logger, ProxyServer proxyServer) {
+    public Commands(Logger logger, ProxyServer proxyServer, Registers registers) {
+        this.registers = registers;
         registry = new HashMap<>();
         this.logger = logger;
         this.proxyServer = proxyServer;
@@ -57,6 +59,24 @@ public class Commands {
                 e.printStackTrace();
             }
         }));
+
+        register("@swp", (((cmd, args, channel, ctx, interceptor) -> {
+            if (args.length >= 3) {
+                char to = args[1].charAt(0);
+                char from = args[2].charAt(0);
+                String val = registers.get(to);
+                registers.set(to, registers.get(from));
+                registers.set(from, val);
+            }
+        })));
+
+        register("@clr", (((cmd, args, channel, ctx, interceptor) -> {
+            if (args.length >= 2) {
+                for (int i = 1; i < args.length; i++) {
+                    registers.clear(args[i].charAt(0));
+                }
+            }
+        })));
     }
 
     public void register(String command, CommandHandler handler) {
