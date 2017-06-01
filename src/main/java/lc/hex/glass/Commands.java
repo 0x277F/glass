@@ -7,18 +7,28 @@ import lc.hex.glass.server.ProxyServer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.Socket;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Singleton
 public class Commands {
+    public static final String PASTEBIN_URL;
+    public static final int PASTEBIN_PORT;
+
     private Map<String, CommandHandler> registry;
     private final Logger logger;
     private final ProxyServer proxyServer;
     private Registers registers;
+
+    static {
+        PASTEBIN_URL = System.getProperty("lc.hex.glass.pastebin", "termbin.com");
+        PASTEBIN_PORT = Integer.parseInt(System.getProperty("lc.hex.glass.pastebinport", "9999"));
+    }
 
     @Inject
     public Commands(Logger logger, ProxyServer proxyServer, Registers registers) {
@@ -43,18 +53,24 @@ public class Commands {
         }));
 
         register("@iex", ((cmd, args, channel, ctx, interceptor) -> {
-            ProcessBuilder pb = new ProcessBuilder("/usr/bin/bash", "-c", Arrays.stream(Arrays.copyOfRange(args, 1, args.length)).collect(Collectors.joining(" ")));
+            ProcessBuilder pb = new ProcessBuilder("bash", "-c", Arrays.stream(Arrays.copyOfRange(args, 1, args.length)).collect(Collectors.joining(" ")));
             pb.redirectErrorStream(true);
             try {
                 Process p = pb.start();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
                 StringBuilder output = new StringBuilder();
+                int lines =  0;
                 String line;
                 while ((line = reader.readLine()) != null) {
                     output.append(line);
                     output.append(System.getProperty("line.separator"));
+                    lines++;
                 }
-                CommandHandler.send(channel, output.toString(), interceptor);
+                if (lines > 3) {
+                    CommandHandler.send(channel, pastebin(output.toString()), interceptor);
+                } else {
+                    CommandHandler.send(channel, output.toString(), interceptor);
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -82,6 +98,18 @@ public class Commands {
     public void register(String command, CommandHandler handler) {
         registry.put(command, handler);
         logger.info("Registered command " + command);
+    }
+
+    public String pastebin(String message) {
+        try (Socket socket = new Socket(PASTEBIN_URL, PASTEBIN_PORT);
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+            out.writeBytes(message);
+            return in.readLine();
+        } catch (IOException e) {
+            logger.warning(e.getMessage());
+        }
+        return "I/O error occurred.";
     }
 
     public CommandHandler get(String command) {
