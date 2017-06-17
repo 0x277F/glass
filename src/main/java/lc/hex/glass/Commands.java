@@ -93,6 +93,19 @@ public class Commands {
                 }
             }
         })));
+
+        register("@acy", (((cmd, args, channel, ctx, interceptor) -> {
+            if (registers.isSet('A')) {
+                for (String user : registers.get('A').split(",")) {
+                    String[] split = user.split(":");
+                    mode(interceptor, channel, true, split[1].charAt(0), split[0]);
+                }
+            }
+        })));
+    }
+
+    private void mode(MessageInterceptor interceptor, String channel, boolean adding, char mode, String args) {
+        interceptor.getUpstream().writeAndFlush("MODE " + channel + (adding ? "+" : "-") + mode + " " + args + "\r\n");
     }
 
     public void register(String command, CommandHandler handler) {
