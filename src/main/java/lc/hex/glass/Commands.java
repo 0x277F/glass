@@ -1,5 +1,15 @@
 package lc.hex.glass;
 
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.LineBasedFrameDecoder;
+import io.netty.handler.codec.string.LineEncoder;
+import io.netty.handler.codec.string.StringDecoder;
+import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.ssl.SslHandler;
 import lc.hex.glass.server.MessageInterceptor;
 import lc.hex.glass.server.ProxyServer;
@@ -7,11 +17,12 @@ import lc.hex.glass.server.ProxyServer;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.Socket;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -46,6 +57,7 @@ public class Commands {
         });
 
         register("@die", ((cmd, args, channel, ctx, interceptor) -> {
+            registers.save();
             for (MessageInterceptor i : proxyServer.getActiveChannels()) {
                 i.getDownstream().close();
             }
@@ -67,7 +79,7 @@ public class Commands {
                     lines++;
                 }
                 if (lines > 3) {
-                    CommandHandler.send(channel, pastebin(output.toString()), interceptor);
+                    pastebin(output.toString(), s -> CommandHandler.send(channel, s, interceptor));
                 } else {
                     CommandHandler.send(channel, output.toString(), interceptor);
                 }
@@ -113,16 +125,26 @@ public class Commands {
         logger.info("Registered command " + command);
     }
 
-    public String pastebin(String message) {
-        try (Socket socket = new Socket(PASTEBIN_URL, PASTEBIN_PORT);
-                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
-            out.writeBytes(message);
-            return in.readLine();
-        } catch (IOException e) {
-            logger.warning(e.getMessage());
-        }
-        return "I/O error occurred.";
+    public void pastebin(String message, Consumer<String> callback) {
+        Bootstrap bootstrap = new Bootstrap();
+        bootstrap
+                .channel(NioSocketChannel.class)
+                .group(new NioEventLoopGroup(1))
+                .handler(new SimpleChannelInboundHandler<String>() {
+                    @Override
+                    protected void channelRead0(ChannelHandlerContext ctx, String msg) throws Exception {
+                        callback.accept(msg);
+                        ctx.channel().close();
+                    }
+                })
+                .connect(PASTEBIN_URL, PASTEBIN_PORT).addListener((ChannelFutureListener) future1 -> {
+                    if (future1.isSuccess()) {
+                        future1.channel().pipeline().addFirst(new StringEncoder(), new LineEncoder(), new LineBasedFrameDecoder(128), new StringDecoder());
+                        future1.channel().writeAndFlush(message);
+                    } else {
+                        callback.accept("I/O Error");
+                    }
+                });
     }
 
     public CommandHandler get(String command) {
