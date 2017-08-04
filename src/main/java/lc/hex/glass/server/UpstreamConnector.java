@@ -7,14 +7,17 @@ import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import lc.hex.glass.Registers;
 
 import javax.inject.Inject;
 import javax.net.ssl.SSLException;
+import java.util.Arrays;
 import java.util.logging.Logger;
 
 public class UpstreamConnector extends SimpleChannelInboundHandler<String> {
 
     private final Logger logger;
+    private Registers registers;
     private Channel clientConnection;
     private Channel channel;
     private SslContext sslContext;
@@ -26,8 +29,9 @@ public class UpstreamConnector extends SimpleChannelInboundHandler<String> {
     private boolean ssl;
 
     @Inject
-    public UpstreamConnector(Logger logger, @Assisted boolean ssl) {
+    public UpstreamConnector(Logger logger, Registers registers, @Assisted boolean ssl) {
         this.logger = logger;
+        this.registers = registers;
         try {
             sslContext = SslContextBuilder.forClient().build();
         } catch (SSLException e) {
@@ -66,6 +70,22 @@ public class UpstreamConnector extends SimpleChannelInboundHandler<String> {
         if (msg.startsWith("PING")) {
             downstream.pinged = true;
         }
+
+        String[] split = msg.split(" ");
+        if (split.length == 5 && split[1].equalsIgnoreCase("MODE") && split[3].endsWith("b")) {
+            if (registers.isSet('b')) {
+                for (String sync : registers.get('b').split(";")) {
+                    String from = sync.split("->")[0];
+                    if (from.equalsIgnoreCase(split[2])) {
+                        String[] to = sync.substring(sync.indexOf("->") + 2).split(",");
+                        for (String c : to) {
+                            ctx.channel().writeAndFlush(String.format("MODE %s %s %s\r\n", c, split[3], split[4]));
+                        }
+                    }
+                }
+            }
+        }
+
         clientConnection.writeAndFlush(msg + "\r\n").addListener((ChannelFutureListener) future -> {
             if (future.isSuccess()) {
                 System.out.println("<<<" + msg);
